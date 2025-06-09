@@ -39,7 +39,7 @@ PurifyPDF never stores files permanently. All PDFs are purged automatically afte
 
 ### 1. Import the Workflow
 
-Import `purifypdf_sanitized_final.json` into your n8n instance.
+Import `purifypdf.json` into your n8n instance.
 
 ### 2. Configure Credentials
 
