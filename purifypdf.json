@@ -1,0 +1,1920 @@
+{
+  "name": "purifypdf",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "63a424e0-ef63-4d13-ba50-4d7fe0b62702",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        400
+      ],
+      "id": "e6271268-83a8-4d34-8881-fdbf2a2f0df8",
+      "name": "Webhook",
+      "webhookId": "63a424e0-ef63-4d13-ba50-4d7fe0b62702"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/file/upload/base64",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"converted.png\",\n  \"async\": true,\n  \"file\": \"={{ 'data:application/pdf;base64,' + $('Extract PDF').first().json.base64Pdf }}\"\n}\n",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        400
+      ],
+      "id": "e7acd647-4511-463d-88c0-119982510dff",
+      "name": "Upload to PDF.co",
+      "executeOnce": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_HTTPHEADERAUTH_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/pdf/convert/to/png",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"{{ $json.url }}\",\n  \"async\": true\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        400
+      ],
+      "id": "b978b970-6165-4751-a0c7-e26067432d20",
+      "name": "Convert PDF to Images",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_HTTPHEADERAUTH_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/pdf/convert/from/image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"{{ $json.urlString }}\",\n  \"name\": \"CLEAN_{{ $('Extract PDF').first().json.filename }}\",\n  \"imageQuality\": 40,\n  \"optimizeForWeb\": true,\n  \"margins\": \"0,0,0,0\",\n  \"async\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2300,
+        300
+      ],
+      "id": "0f56cf4b-360d-45ac-bdd7-9c1372492b5a",
+      "name": "Create PDF from Images",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_HTTPHEADERAUTH_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4000,
+        420
+      ],
+      "id": "e721b670-55d4-4970-a9b2-34a2f8e48511",
+      "name": "Download Clean PDF"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Convert PDF to Images').item.json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1900,
+        300
+      ],
+      "id": "bdaa422a-2106-44f2-8b3e-9380a378382d",
+      "name": "Get Image URLs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const urlArray = items.map(item => item.json);\n// If each item.json is a string (the URL), this works:\nreturn [\n  {\n    json: {\n      urlString: urlArray.join(',')\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2100,
+        300
+      ],
+      "id": "f074b0e5-b45c-4b57-8495-a8fb40d82c47",
+      "name": "Join Image URLs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst subject = input.body.Subject || 'No Subject';\nconst from = input.body.From || input.body.FromFull?.Email || null;\nconst attachments = input.body.Attachments || [];\n\nconst isRegistration = subject.toLowerCase().includes(\"register\");\n\n// \u2705 Registration check comes first and short-circuits everything else\nif (isRegistration) {\n  return [{\n    json: {\n      status: \"register\",\n      originalSender: from,\n      originalSubject: subject\n    }\n  }];\n}\n\n// \u2b07\ufe0f Only check for a PDF if not registration\nconst pdfAttachment = attachments.find(\n  a => a.ContentType === 'application/pdf'\n);\n\nif (!pdfAttachment) {\n  return [{\n    json: {\n      status: \"no_pdf\",\n      originalSender: from,\n      originalSubject: subject\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    status: \"ok\",\n    base64Pdf: pdfAttachment.Content,\n    filename: pdfAttachment.Name || 'uploaded.pdf',\n    originalSender: from,\n    originalSubject: subject\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1460,
+        400
+      ],
+      "id": "54414e12-826d-4e20-998e-17856cca33bd",
+      "name": "Extract PDF"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3400,
+        640
+      ],
+      "id": "dd4fc8f3-2e49-4fe3-b305-5cdb8ce5da91",
+      "name": "Wait for PDF",
+      "webhookId": "ba551daf-f054-40f5-a8ca-30d1d2bbf440"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        760
+      ],
+      "id": "869df3c3-d9ff-4eb7-99f6-40ef01e8ac62",
+      "name": "Wait for Images",
+      "webhookId": "7a8393c9-e4ed-4bfc-b883-192c542ef496"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/job/check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobid",
+              "value": "={{ $('Convert PDF to Images').item.json.jobId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        420
+      ],
+      "id": "a4a97715-85fb-405d-a948-6c4ac8a8a786",
+      "name": "Check Image Status",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_HTTPHEADERAUTH_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "PurifyPDF <demo@yourdomain.com>",
+        "toEmail": "={{ $('Extract PDF').first().json.originalSender }}",
+        "subject": "=PurifyPDF Error \u2013 We Couldn't Clean Your PDF",
+        "html": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; color: #333; background-color: #f8f8f8; padding: 20px;\">\n    <div style=\"background-color: #ffffff; padding: 20px; border-radius: 6px; max-width: 600px; margin: auto;\">\n      <h2 style=\"color: #c0392b;\">We're Sorry \u2013 PDF Sanitization Failed</h2>\n      <p>Hello,</p>\n      <p>Unfortunately, we encountered a problem while trying to sanitize your PDF.</p>\n      <p>This may have happened due to:</p>\n      <ul>\n        <li>A corrupt or unsupported file format</li>\n        <li>Security settings that blocked processing</li>\n        <li>A temporary service issue</li>\n      </ul>\n      <p>Please try again, or feel free to reach out if the problem persists.</p>\n      <p style=\"margin-top: 30px;\">Thank you,<br><strong>The PurifyPDF Team</strong></p>\n    </div>\n  </body>\n</html>\n",
+        "options": {
+          "attachments": "="
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3920,
+        1160
+      ],
+      "id": "dae98a84-63dc-4c58-8853-8d760acf8454",
+      "name": "Send Failure Email",
+      "webhookId": "2c28e1a8-3432-479b-a442-4f2b55f1d8e0",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_SMTP_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "PurifyPDF <demo@yourdomain.com>",
+        "toEmail": "={{ $('Extract PDF').first().json.originalSender }}",
+        "subject": "=Your Purified PDF is Ready -  CLEAN_{{ $('Extract PDF').first().json.filename }}",
+        "html": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; color: #333; background-color: #f8f8f8; padding: 20px;\">\n    <div style=\"background-color: #ffffff; padding: 20px; border-radius: 6px; max-width: 600px; margin: auto;\">\n      <h2 style=\"color: #2c3e50;\">Your Purified PDF is Ready</h2>\n      <p>Hello,</p>\n      <p>We\u2019ve successfully sanitized your PDF to remove:</p>\n      <ul>\n        <li>Hidden metadata</li>\n        <li>Embedded scripts</li>\n        <li>Potentially unsafe elements</li>\n      </ul>\n      <p>The clean PDF is attached to this email.</p>\n      <p>If you didn\u2019t request this, you can safely ignore it.</p>\n      <p style=\"margin-top: 30px;\">Thank you,<br><strong>The PurifyPDF Team</strong></p>\n    </div>\n  </body>\n</html>\n",
+        "options": {
+          "attachments": "={{ 'data' }}"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4220,
+        420
+      ],
+      "id": "de2895e4-c3e4-4651-8586-652b7d1c673c",
+      "name": "Send Cleaned Email",
+      "webhookId": "2c28e1a8-3432-479b-a442-4f2b55f1d8e0",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_SMTP_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "success",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "733e5ca0-5d8e-4e9a-96e9-9792ba4ee442"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a5ea5ef7-79a1-4be9-9575-9f56bfb9b7a7",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "working",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4114084d-e081-43a0-af8d-32d86c5c88b5",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "519ed165-1af2-4589-878e-410bf71fdcd3",
+                    "leftValue": "={{ $json.retryCount }} ",
+                    "rightValue": 10,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1580,
+        360
+      ],
+      "id": "e72ad090-c51b-41c9-8100-18292ba74b68",
+      "name": "Image Switch"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "success",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "733e5ca0-5d8e-4e9a-96e9-9792ba4ee442"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a5ea5ef7-79a1-4be9-9575-9f56bfb9b7a7",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "working",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4114084d-e081-43a0-af8d-32d86c5c88b5",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        3640,
+        420
+      ],
+      "id": "b08fb40a-bc54-4274-9b21-46c854deb710",
+      "name": "PDF Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdf.co/v1/job/check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobid",
+              "value": "={{ $('Create PDF from Images').item.json.jobId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2940,
+        360
+      ],
+      "id": "fa8e9049-caba-4b06-9aaa-6a0dd9fdcf7e",
+      "name": "Check PDF Status",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_HTTPHEADERAUTH_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "user-verification",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        1260
+      ],
+      "id": "52895b7f-51e4-4807-b2ba-562f8323d5cc",
+      "name": "Verification",
+      "webhookId": "de55129b-9090-4c8c-8bad-30156970f23f"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "list",
+          "cachedResultName": "purifypdf",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_USERS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z/tblzihHk77gKQXe60"
+        },
+        "filterByFormula": "=AND({VerificationToken} = \"{{ $json.query.token }}\", NOT({Verified}))",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -160,
+        1260
+      ],
+      "id": "c0a94bb2-01ef-489c-a529-633146acce52",
+      "name": "Check Token",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_AIRTABLETOKENAPI_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8ada00a2-a1e3-4911-9eaf-82835b66e16e",
+              "leftValue": "={{  Object.keys($json).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        60,
+        1260
+      ],
+      "id": "163a9afe-f3ef-4f90-ba91-229892258f2a",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "list",
+          "cachedResultName": "purifypdf",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_USERS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z/tblzihHk77gKQXe60"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "verified": true,
+            "id": "={{ $json.id }}",
+            "verifiedAt": "={{ $now.toISO() }}\n"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "verified",
+              "displayName": "verified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "verificationToken",
+              "displayName": "verificationToken",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tokenExpiry",
+              "displayName": "tokenExpiry",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "pdfCount",
+              "displayName": "pdfCount",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "pdfLimit",
+              "displayName": "pdfLimit",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "lastUsed",
+              "displayName": "lastUsed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "verifiedAt",
+              "displayName": "verifiedAt",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        1240
+      ],
+      "id": "6fd612a9-a703-4146-b99d-f5633da35a86",
+      "name": "Verified",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_AIRTABLETOKENAPI_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "PurifyPDF <demo@yourdomain.com>",
+        "toEmail": "={{ $json.fields.email }}",
+        "subject": "=You\u2019re Verified \u2013 Welcome to PurifyPDF",
+        "html": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; color: #333; background-color: #f8f8f8; padding: 20px;\">\n    <div style=\"background-color: #ffffff; padding: 20px; border-radius: 6px; max-width: 600px; margin: auto;\">\n      <h2 style=\"color: #2c3e50;\">You're All Set!</h2>\n      <p>Hello,</p>\n      <p>Your email has been successfully verified. You can now send PDFs to <strong>clean@purifypdf.xyz</strong> and we\u2019ll take care of the rest.</p>\n      <p>We\u2019ll scan each file and return a sanitized copy that\u2019s free from:</p>\n      <ul>\n        <li>Hidden metadata</li>\n        <li>Embedded scripts</li>\n        <li>Potentially unsafe elements</li>\n      </ul>\n      <p>If you ever have questions or need help, just reply to this email.</p>\n      <p style=\"margin-top: 30px;\">Thank you,<br><strong>The PurifyPDF Team</strong></p>\n    </div>\n  </body>\n</html>\n",
+        "options": {
+          "attachments": "="
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        600,
+        1240
+      ],
+      "id": "302c67d7-4b88-4b97-9a5c-8cecc0611fd9",
+      "name": "Send Verified Email",
+      "webhookId": "2c28e1a8-3432-479b-a442-4f2b55f1d8e0",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_SMTP_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "list",
+          "cachedResultName": "purifypdf",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_USERS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z/tblzihHk77gKQXe60"
+        },
+        "filterByFormula": "={email} = \"{{ $json.originalSender }}\"",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -760,
+        400
+      ],
+      "id": "a3ae0f5b-edb2-4e07-b010-e02b1fc8ee57",
+      "name": "Find User",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_AIRTABLETOKENAPI_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const record = $input.first().json;\n\nif (!record || !record.email) {\n  return [{ json: { status: 'not_found' } }];\n}\n\nconst overLimit = (record.pdfCount || 0) >= (record.pdfLimit || 5);\n\nreturn [{\n  json: {\n    status: record.verified ? (overLimit ? 'over_limit' : 'verified') : 'unverified',\n    recordId: record.id,\n    pdfCount: record.pdfCount || 0\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -540,
+        400
+      ],
+      "id": "f3af18c2-9039-40f7-94e6-af433cba19bf",
+      "name": "Return User Status"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "not_found",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7b2b8100-9cfe-451d-9c53-f3f0bf5284c1"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "609bd18d-b5bb-4dad-b213-48f00b8bfe70",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "unverified",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "63ec0821-9c1e-4612-ab3e-bc3b726136ec",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "over_limit",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1054fdea-2778-4451-b14f-ea6cba5e73ba",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "verified",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -320,
+        400
+      ],
+      "id": "0eb3ae53-1139-4013-b99b-aa844d67b186",
+      "name": "Route User Status"
+    },
+    {
+      "parameters": {
+        "jsCode": "function generateToken(length = 32) {\n  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';\n  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');\n}\n\nconst token = generateToken();\nconst email = $json.originalSender;\n\nreturn [{\n  json: {\n    email,\n    token,\n    verificationUrl: `https://your-n8n-instance.com/webhook/user-verification?token=${token}`\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d488ad3d-05b7-48c1-98d4-5a7faa55064f",
+      "name": "Generate Token"
+    },
+    {
+      "parameters": {
+        "fromEmail": "PurifyPDF <demo@yourdomain.com>",
+        "toEmail": "={{ $json.fields.email }}",
+        "subject": "=Verify Your Email - PurifyPDF",
+        "html": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; color: #333; background-color: #f8f8f8; padding: 20px;\">\n    <div style=\"background-color: #ffffff; padding: 20px; border-radius: 6px; max-width: 600px; margin: auto;\">\n      <h2 style=\"color: #2c3e50;\">Verify Your Email to Start Cleaning PDFs</h2>\n      <p>Hello,</p>\n      <p>Before we can sanitize your PDF, please verify your email address. This helps us protect your data and prevent misuse of our service.</p>\n      <p>Click the button below to verify:</p>\n      <p style=\"text-align: center; margin: 30px 0;\">\n        <a href=\"{{ $('Generate Token').item.json.verificationUrl }}\" style=\"background-color: #2c3e50; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;\">\n          Verify Email\n        </a>\n      </p>\n      <p>If you didn't request this, you can safely ignore this email.</p>\n      <p style=\"margin-top: 30px;\">Thank you,<br><strong>The PurifyPDF Team</strong></p>\n    </div>\n  </body>\n</html>\n",
+        "options": {
+          "attachments": "="
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        0
+      ],
+      "id": "413b4e40-0290-4624-8877-6c2a06ec0534",
+      "name": "Send Verification Link",
+      "webhookId": "2c28e1a8-3432-479b-a442-4f2b55f1d8e0",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_SMTP_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; padding: 30px;\">\n    <h2 style=\"color: #2c3e50;\">\u2705 You're Verified!</h2>\n    <p>Your email has been verified. You can now send PDFs to <strong>clean@purifypdf.xyz</strong>.</p>\n    <p>We\u2019ll sanitize and return them automatically.</p>\n    <p>Thanks for using <strong>PurifyPDF</strong>!</p>\n  </body>\n</html>\n",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.3,
+      "position": [
+        840,
+        1240
+      ],
+      "id": "fb4403b8-d906-4978-b812-6cf643e59996",
+      "name": "Verification Page"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; padding: 30px;\">\n    <h2 style=\"color: #c0392b;\">\u26d4 Verification Failed</h2>\n    <p>This verification link is invalid, already used, or has expired.</p>\n    <p>If you believe this is an error, contact <a href=\"mailto:support@yourdomain.com\">support@yourdomain.com</a>.</p>\n  </body>\n</html>\n",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        1500
+      ],
+      "id": "a2a1ae0e-9bc3-473a-98d3-580b24c46e79",
+      "name": "Bad Verification Link"
+    },
+    {
+      "parameters": {
+        "fromEmail": "PurifyPDF <demo@yourdomain.com>",
+        "toEmail": "={{ $('Find User').item.json.email }}",
+        "subject": "=You've Reached Your PurifyPDF Limit",
+        "html": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; padding: 30px;\">\n    <h2 style=\"color: #c0392b;\">\ud83d\udcc4 Limit Reached</h2>\n    <p>Hello,</p>\n    <p>You've reached your free PurifyPDF usage limit.</p>\n    <p>If you'd like more sanitizations, reply to this email and let us know. We may offer a paid service in the future.</p>\n    <p>Thanks for trying <strong>PurifyPDF</strong>!</p>\n  </body>\n</html>\n",
+        "options": {
+          "attachments": "="
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        220
+      ],
+      "id": "96cd3611-7c6b-40d4-b33b-087fdeca3e8f",
+      "name": "Send Over Limit Email",
+      "webhookId": "2c28e1a8-3432-479b-a442-4f2b55f1d8e0",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_SMTP_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "list",
+          "cachedResultName": "purifypdf",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_USERS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z/tblzihHk77gKQXe60"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Find User').first().json.id }}",
+            "pdfCount": "={{ $('Find User').first().json.pdfCount + 1 }}",
+            "lastUsed": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "verified",
+              "displayName": "verified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "verificationToken",
+              "displayName": "verificationToken",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tokenExpiry",
+              "displayName": "tokenExpiry",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "pdfCount",
+              "displayName": "pdfCount",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pdfLimit",
+              "displayName": "pdfLimit",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "lastUsed",
+              "displayName": "lastUsed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "verifiedAt",
+              "displayName": "verifiedAt",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        4460,
+        420
+      ],
+      "id": "0bacae30-6b52-4b50-ad48-18c75e499ad8",
+      "name": "Update Last Used",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_AIRTABLETOKENAPI_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe35a81c-e642-4f90-a095-489d07312bea",
+              "name": "retryCount",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        400
+      ],
+      "id": "3b0efe10-5f87-4ce0-bad7-429918027886",
+      "name": "Set Image Retry Count"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a17a6ba0-611b-4715-a583-ab51f35887c9",
+              "name": "retryCount",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2520,
+        300
+      ],
+      "id": "f026ceed-d8e7-4f41-9125-bde87a2c0da4",
+      "name": "Reset Retry Count"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: {\n    ...item,\n    retryCount: (item.retryCount || 0) + 1\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        420
+      ],
+      "id": "2b5b5d4d-6b97-4436-ba02-7565563407d3",
+      "name": "Increment Image Retry"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: {\n    ...item,\n    retryCount: (item.retryCount || 0) + 1\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3160,
+        360
+      ],
+      "id": "27c6d0cc-fc96-4e4c-8e86-5bdd2f8bc3bf",
+      "name": "Increment PDF Retry"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "ok",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "1983df30-f37a-4473-8be6-0a6e8e6f9bd5"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9ffe2f02-f434-4e96-9ca4-c086c762a000",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "no_pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4920c09d-216b-4a65-9be7-9cda3af11098",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "register",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1240,
+        400
+      ],
+      "id": "7a41b4f3-a87e-457f-9e66-3b3057728163",
+      "name": "PDF Check"
+    },
+    {
+      "parameters": {
+        "fromEmail": "PurifyPDF <demo@yourdomain.com>",
+        "toEmail": "={{ $json.originalSender }}",
+        "subject": "=PurifyPDF \u2013 No PDF Found in Your Message",
+        "html": "=<!DOCTYPE html>\n<html>\n  <body style=\"font-family: Arial, sans-serif; color: #333; background-color: #f8f8f8; padding: 20px;\">\n    <div style=\"background-color: #ffffff; padding: 20px; border-radius: 6px; max-width: 600px; margin: auto;\">\n      <h2 style=\"color: #c0392b;\">No PDF Found</h2>\n      <p>Hello,</p>\n      <p>We received your email, but it didn\u2019t include a PDF attachment.</p>\n      <p>Please double-check your message and try sending it again with a PDF file attached. We\u2019ll sanitize it and send the cleaned version right back.</p>\n      <p>If you continue having trouble, just send an email to support@yourdomain.com</p>\n      <p style=\"margin-top: 30px;\">Thank you,<br><strong>The PurifyPDF Team</strong></p>\n    </div>\n  </body>\n</html>",
+        "options": {
+          "attachments": "="
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -1020,
+        600
+      ],
+      "id": "de1b036e-7f39-42c5-8f6c-451ec719ac00",
+      "name": "Send No PDF Email",
+      "webhookId": "2c28e1a8-3432-479b-a442-4f2b55f1d8e0",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_SMTP_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "list",
+          "cachedResultName": "purifypdf",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_USERS_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": "https://airtable.com/appsIq8gkC0Mo6Z0Z/tblzihHk77gKQXe60"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "verified": false,
+            "email": "={{ $('Extract PDF').item.json.originalSender }}",
+            "verificationToken": "={{ $json.token }}",
+            "pdfCount": 0,
+            "pdfLimit": 3,
+            "tokenExpiry": "={{ new Date(Date.now() + 1000 * 60 * 60).toISOString() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "verified",
+              "displayName": "verified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "verificationToken",
+              "displayName": "verificationToken",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tokenExpiry",
+              "displayName": "tokenExpiry",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pdfCount",
+              "displayName": "pdfCount",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pdfLimit",
+              "displayName": "pdfLimit",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "lastUsed",
+              "displayName": "lastUsed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "verifiedAt",
+              "displayName": "verifiedAt",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        0
+      ],
+      "id": "1974dc3d-ca3d-457c-9b89-d94e9f68992f",
+      "name": "Add User",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_AIRTABLETOKENAPI_NAME"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to PDF.co": {
+      "main": [
+        [
+          {
+            "node": "Convert PDF to Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert PDF to Images": {
+      "main": [
+        [
+          {
+            "node": "Set Image Retry Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create PDF from Images": {
+      "main": [
+        [
+          {
+            "node": "Reset Retry Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Clean PDF": {
+      "main": [
+        [
+          {
+            "node": "Send Cleaned Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image URLs": {
+      "main": [
+        [
+          {
+            "node": "Join Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join Image URLs": {
+      "main": [
+        [
+          {
+            "node": "Create PDF from Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF": {
+      "main": [
+        [
+          {
+            "node": "PDF Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for PDF": {
+      "main": [
+        [
+          {
+            "node": "Check PDF Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Images": {
+      "main": [
+        [
+          {
+            "node": "Check Image Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Image Status": {
+      "main": [
+        [
+          {
+            "node": "Increment Image Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Cleaned Email": {
+      "main": [
+        [
+          {
+            "node": "Update Last Used",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for Images",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Failure Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check PDF Status": {
+      "main": [
+        [
+          {
+            "node": "Increment PDF Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Switch": {
+      "main": [
+        [
+          {
+            "node": "Download Clean PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Failure Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verification": {
+      "main": [
+        [
+          {
+            "node": "Check Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Token": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Verified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bad Verification Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verified": {
+      "main": [
+        [
+          {
+            "node": "Send Verified Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find User": {
+      "main": [
+        [
+          {
+            "node": "Return User Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return User Status": {
+      "main": [
+        [
+          {
+            "node": "Route User Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route User Status": {
+      "main": [
+        [
+          {
+            "node": "Generate Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Over Limit Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upload to PDF.co",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Token": {
+      "main": [
+        [
+          {
+            "node": "Add User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Verified Email": {
+      "main": [
+        [
+          {
+            "node": "Verification Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Image Retry Count": {
+      "main": [
+        [
+          {
+            "node": "Check Image Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Retry Count": {
+      "main": [
+        [
+          {
+            "node": "Check PDF Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Image Retry": {
+      "main": [
+        [
+          {
+            "node": "Image Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment PDF Retry": {
+      "main": [
+        [
+          {
+            "node": "PDF Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Check": {
+      "main": [
+        [
+          {
+            "node": "Find User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send No PDF Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add User": {
+      "main": [
+        [
+          {
+            "node": "Send Verification Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6cf4eecc-c04e-4395-92a6-7bd2b302b600",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a1fdd2257136111c40826c3fd16d745ab9f8be90e8a65320824068f77c64fbe0"
+  },
+  "id": "LLi921S9dLKqbevg",
+  "tags": []
+}
