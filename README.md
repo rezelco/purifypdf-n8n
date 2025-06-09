@@ -59,7 +59,7 @@ In the imported workflow, update:
 
 ## 📦 Files
 
-- `purifypdf_sanitized_final.json` – Main workflow file
+- `purifypdf.json` – Main workflow file
 
 ---
 
